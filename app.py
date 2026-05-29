@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Environment variables
 UPLOAD_URL = os.environ.get('UPLOAD_URL', '')
-PROJECT_URL = os.environ.get('PROJECT_URL', '')        ,
+PROJECT_URL = os.environ.get('PROJECT_URL', '')        
 AUTO_ACCESS = os.environ.get('AUTO_ACCESS', 'false').lower() == 'true'  
 FILE_PATH = os.environ.get('FILE_PATH', './.cache')   
 SUB_PATH = os.environ.get('SUB_PATH', 'sub')           
@@ -287,7 +287,34 @@ async def download_files_and_run():
             print(f"Error executing command: {e}")
     
     time.sleep(5)
-    
+    # 补全缺少的 generate_links 函数
+async def generate_links(argo_domain):
+    try:
+        # 这里根据你的 mouse.json 里面的配置生成对应的 VLESS/VMESS 节点链接
+        # 伪代码逻辑示例如下：
+        vless_ws = f"vless://{UUID}@{argo_domain}:443?encryption=none&security=tls&type=ws&host={argo_domain}&path=%2Fvless-argo#Argo-Vless"
+        vmess_ws = f"vmess://" + base64.b64encode(json.dumps({
+            "v": "2", "ps": "Argo-Vmess", "add": argo_domain, "port": "443",
+            "id": UUID, "aid": "0", "scy": "auto", "net": "ws", "type": "none",
+            "host": argo_domain, "path": "/vmess-argo", "tls": "tls"
+        }).encode('utf-8')).decode('utf-8')
+        
+        # 将生成的链接下发或写入 sub.txt
+        all_nodes = f"{vless_ws}\n{vmess_ws}"
+        encoded_nodes = base64.b64encode(all_nodes.encode('utf-8')).decode('utf-8')
+        
+        with open(sub_path, 'w') as f:
+            f.write(encoded_nodes)
+        print("Subscription file (sub.txt) generated successfully.")
+    except Exception as e:
+        print(f"Error generating links: {e}")
+
+# 补全 start_server 中调用的缺失函数
+def add_visit_task():
+    print("Visit task added (Stub)")
+
+def clean_files():
+    print("Clean files task completed (Stub)")
     # Extract domains and generate sub.txt
     await extract_domains()
 
