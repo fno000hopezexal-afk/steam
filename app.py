@@ -30,7 +30,7 @@ CFPORT = int(os.environ.get('CFPORT', '443'))
 NAME = os.environ.get('NAME', 'streamlit')                   
 CHAT_ID = os.environ.get('CHAT_ID', '')                
 dog_TOKEN = os.environ.get('dog_TOKEN', '')           
-PORT = int(os.environ.get('SERVER_PORT') or os.environ.get('PORT') or 3000) 
+PORT = int(os.environ.get('SERVER_PORT') or os.environ.get('PORT') or 20668) 
 
 # Create running folder
 def create_directory():
