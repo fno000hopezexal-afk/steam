@@ -228,70 +228,9 @@ def exec_cmd(command):
         print(f"Error executing command: {e}")
         return str(e)
 
-# Download and run necessary files
-async def download_files_and_run():
-    global private_key, public_key
-    
-    architecture = get_system_architecture()
-    files_to_download = get_files_for_architecture(architecture)
-    
-    if not files_to_download:
-        print("Can't find a file for the current architecture")
-        return
-    
-    # Download all files
-    download_success = True
-    for file_info in files_to_download:
-        if not download_file(file_info["fileName"], file_info["fileUrl"]):
-            download_success = False
-    
-    if not download_success:
-        print("Error downloading files")
-        return
-    
-    # Authorize files
-    files_to_authorize = ['npm', 'cat', 'dog'] if NEZHA_PORT else ['php', 'cat', 'dog']
-    authorize_files(files_to_authorize)
-    
-   
-    
-    # Generate configuration file
-    config ={"log":{"access":"/dev/null","error":"/dev/null","loglevel":"none",},"inbounds":[{"port":ARGO_PORT ,"protocol":"vless","settings":{"clients":[{"id":UUID ,"flow":"xtls-rprx-vision",},],"decryption":"none","fallbacks":[{"dest":3001 },{"path":"/vless-argo","dest":3002 },{"path":"/vmess-argo","dest":3003 },{"path":"/trojan-argo","dest":3004 },],},"streamSettings":{"network":"tcp",},},{"port":3001 ,"listen":"127.0.0.1","protocol":"vless","settings":{"clients":[{"id":UUID },],"decryption":"none"},"streamSettings":{"network":"ws","security":"none"}},{"port":3002 ,"listen":"127.0.0.1","protocol":"vless","settings":{"clients":[{"id":UUID ,"level":0 }],"decryption":"none"},"streamSettings":{"network":"ws","security":"none","wsSettings":{"path":"/vless-argo"}},"sniffing":{"enabled":False ,"destOverride":["http","tls","quic"],"metadataOnly":False }},{"port":3003 ,"listen":"127.0.0.1","protocol":"vmess","settings":{"clients":[{"id":UUID ,"alterId":0 }]},"streamSettings":{"network":"ws","wsSettings":{"path":"/vmess-argo"}},"sniffing":{"enabled":False ,"destOverride":["http","tls","quic"],"metadataOnly":False }},{"port":3004 ,"listen":"127.0.0.1","protocol":"trojan","settings":{"clients":[{"password":UUID },]},"streamSettings":{"network":"ws","security":"none","wsSettings":{"path":"/trojan-argo"}},"sniffing":{"enabled":False ,"destOverride":["http","tls","quic"],"metadataOnly":False }},],"outbounds":[{"protocol":"freedom","tag": "direct" },{"protocol":"blackhole","tag":"block"}]}
-    with open(os.path.join(FILE_PATH, 'mouse.json'), 'w', encoding='utf-8') as config_file:
-        json.dump(config, config_file, ensure_ascii=False, indent=2)
-    
-       
-    # Run sbX
-    command = f"nohup {os.path.join(FILE_PATH, 'cat')} -c {os.path.join(FILE_PATH, 'mouse.json')} >/dev/null 2>&1 &"
-    try:
-        exec_cmd(command)
-        print('cat is running')
-        time.sleep(1)
-    except Exception as e:
-        print(f"cat running error: {e}")
-    
-    # Run cloudflared
-    if os.path.exists(os.path.join(FILE_PATH, 'dog')):
-        if re.match(r'^[A-Z0-9a-z=]{120,250}$', ARGO_AUTH):
-            args = f"tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token {ARGO_AUTH}"
-        elif "TunnelSecret" in ARGO_AUTH:
-            args = f"tunnel --edge-ip-version auto --config {os.path.join(FILE_PATH, 'tunnel.yml')} run"
-        else:
-            args = f"tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile {os.path.join(FILE_PATH, 'boot.log')} --loglevel info --url http://localhost:{ARGO_PORT}"
-        
-        try:
-            exec_cmd(f"nohup {os.path.join(FILE_PATH, 'dog')} {args} >/dev/null 2>&1 &")
-            print('dog is running')
-            time.sleep(2)
-        except Exception as e:
-            print(f"Error executing command: {e}")
-    
-    time.sleep(5)
-    # 补全缺少的 generate_links 函数
+# Generate links function
 async def generate_links(argo_domain):
     try:
-        # 这里根据你的 mouse.json 里面的配置生成对应的 VLESS/VMESS 节点链接
-        # 伪代码逻辑示例如下：
         vless_ws = f"vless://{UUID}@{argo_domain}:443?encryption=none&security=tls&type=ws&host={argo_domain}&path=%2Fvless-argo#Argo-Vless"
         vmess_ws = f"vmess://" + base64.b64encode(json.dumps({
             "v": "2", "ps": "Argo-Vmess", "add": argo_domain, "port": "443",
@@ -299,7 +238,6 @@ async def generate_links(argo_domain):
             "host": argo_domain, "path": "/vmess-argo", "tls": "tls"
         }).encode('utf-8')).decode('utf-8')
         
-        # 将生成的链接下发或写入 sub.txt
         all_nodes = f"{vless_ws}\n{vmess_ws}"
         encoded_nodes = base64.b64encode(all_nodes.encode('utf-8')).decode('utf-8')
         
@@ -309,14 +247,12 @@ async def generate_links(argo_domain):
     except Exception as e:
         print(f"Error generating links: {e}")
 
-# 补全 start_server 中调用的缺失函数
+# Additional helper tasks
 def add_visit_task():
     print("Visit task added (Stub)")
 
 def clean_files():
     print("Clean files task completed (Stub)")
-    # Extract domains and generate sub.txt
-    await extract_domains()
 
 # Extract domains from cloudflared logs
 async def extract_domains():
@@ -346,7 +282,6 @@ async def extract_domains():
                 await generate_links(argo_domain)
             else:
                 print('ArgoDomain not found, re-running dog to obtain ArgoDomain')
-                # Remove boot.log and restart dog
                 if os.path.exists(boot_log_path):
                     os.remove(boot_log_path)
                 
@@ -355,20 +290,74 @@ async def extract_domains():
                 except:
                     pass
                 
-                time.sleep(1)
+                await asyncio.sleep(1)
                 args = f'tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile {FILE_PATH}/boot.log --loglevel info --url http://localhost:{ARGO_PORT}'
                 exec_cmd(f'nohup {os.path.join(FILE_PATH, "dog")} {args} >/dev/null 2>&1 &')
                 print('dog is running.')
-                time.sleep(6)  # Wait 6 seconds
+                await asyncio.sleep(6)  # Wait 6 seconds (non-blocking)
                 await extract_domains()  # Try again
         except Exception as e:
             print(f'Error reading boot.log: {e}')
 
-
+# Download and run necessary files
+async def download_files_and_run():
+    global private_key, public_key
     
-
-
+    architecture = get_system_architecture()
+    files_to_download = get_files_for_architecture(architecture)
     
+    if not files_to_download:
+        print("Can't find a file for the current architecture")
+        return
+    
+    # Download all files
+    download_success = True
+    for file_info in files_to_download:
+        if not download_file(file_info["fileName"], file_info["fileUrl"]):
+            download_success = False
+    
+    if not download_success:
+        print("Error downloading files")
+        return
+    
+    # Authorize files
+    files_to_authorize = ['npm', 'cat', 'dog'] if NEZHA_PORT else ['php', 'cat', 'dog']
+    authorize_files(files_to_authorize)
+    
+    # Generate configuration file
+    config = {"log":{"access":"/dev/null","error":"/dev/null","loglevel":"none",},"inbounds":[{"port":ARGO_PORT ,"protocol":"vless","settings":{"clients":[{"id":UUID ,"flow":"xtls-rprx-vision",},],"decryption":"none","fallbacks":[{"dest":3001 },{"path":"/vless-argo","dest":3002 },{"path":"/vmess-argo","dest":3003 },{"path":"/trojan-argo","dest":3004 },],},"streamSettings":{"network":"tcp",},},{"port":3001 ,"listen":"127.0.0.1","protocol":"vless","settings":{"clients":[{"id":UUID },],"decryption":"none"},"streamSettings":{"network":"ws","security":"none"}},{"port":3002 ,"listen":"127.0.0.1","protocol":"vless","settings":{"clients":[{"id":UUID ,"level":0 }],"decryption":"none"},"streamSettings":{"network":"ws","security":"none","wsSettings":{"path":"/vless-argo"}},"sniffing":{"enabled":False ,"destOverride":["http","tls","quic"],"metadataOnly":False }},{"port":3003 ,"listen":"127.0.0.1","protocol":"vmess","settings":{"clients":[{"id":UUID ,"alterId":0 }]},"streamSettings":{"network":"ws","wsSettings":{"path":"/vmess-argo"}},"sniffing":{"enabled":False ,"destOverride":["http","tls","quic"],"metadataOnly":False }},{"port":3004 ,"listen":"127.0.0.1","protocol":"trojan","settings":{"clients":[{"password":UUID },]},"streamSettings":{"network":"ws","security":"none","wsSettings":{"path":"/trojan-argo"}},"sniffing":{"enabled":False ,"destOverride":["http","tls","quic"],"metadataOnly":False }},],"outbounds":[{"protocol":"freedom","tag": "direct" },{"protocol":"blackhole","tag":"block"}]}
+    with open(os.path.join(FILE_PATH, 'mouse.json'), 'w', encoding='utf-8') as config_file:
+        json.dump(config, config_file, ensure_ascii=False, indent=2)
+    
+    # Run sbX
+    command = f"nohup {os.path.join(FILE_PATH, 'cat')} -c {os.path.join(FILE_PATH, 'mouse.json')} >/dev/null 2>&1 &"
+    try:
+        exec_cmd(command)
+        print('cat is running')
+        await asyncio.sleep(1)
+    except Exception as e:
+        print(f"cat running error: {e}")
+    
+    # Run cloudflared
+    if os.path.exists(os.path.join(FILE_PATH, 'dog')):
+        if re.match(r'^[A-Z0-9a-z=]{120,250}$', ARGO_AUTH):
+            args = f"tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token {ARGO_AUTH}"
+        elif "TunnelSecret" in ARGO_AUTH:
+            args = f"tunnel --edge-ip-version auto --config {os.path.join(FILE_PATH, 'tunnel.yml')} run"
+        else:
+            args = f"tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile {os.path.join(FILE_PATH, 'boot.log')} --loglevel info --url http://localhost:{ARGO_PORT}"
+        
+        try:
+            exec_cmd(f"nohup {os.path.join(FILE_PATH, 'dog')} {args} >/dev/null 2>&1 &")
+            print('dog is running')
+            await asyncio.sleep(2)
+        except Exception as e:
+            print(f"Error executing command: {e}")
+    
+    await asyncio.sleep(5)
+    # 在正确的异步环境中调用 extract_domains
+    await extract_domains()
+
 # Main function to start the server
 async def start_server():
     delete_nodes()
@@ -388,7 +377,7 @@ def run_server():
     server = HTTPServer(('0.0.0.0', PORT), RequestHandler)
     print(f"Server is running on port {PORT}")
     print(f"Running done！")
-    print(f"\nLogs will be delete in 90 seconds")
+    print(f"\nLogs will be deleted in 90 seconds")
     server.serve_forever()
     
 def run_async():
